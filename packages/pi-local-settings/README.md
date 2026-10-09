@@ -1,26 +1,18 @@
 # pi-local-settings
 
-Add **skills**, **prompt templates**, and **themes** from a local-only
-`.pi/settings.local.json`, without changing Pi's shared settings.
+Load **skills**, **prompt templates** and **themes** from
+`.pi/settings.local.json` without changing Pi's shared settings.
 
-Tested with Pi **1.1.0** (`@earendil-works/pi-coding-agent`) and Node
-**24.14.1**. Requires Node >=24.14.1; other Pi versions are not yet verified.
+Requires Node **>=24.14.1**. Tested with Pi **1.1.0**; other Pi versions are not
+verified.
 
 ## Install
-
-After publication:
 
 ```sh
 pi install npm:@chenwei791129/pi-local-settings
 ```
 
-For a local checkout, use one entry only:
-
-```sh
-pi -e ./packages/pi-local-settings/src/index.ts
-# Alternatively: pi install /absolute/path/to/pi-extensions
-```
-
+For a local checkout: `pi -e ./packages/pi-local-settings/src/index.ts`.
 Do not install both the repository and its individual package.
 
 ## Configure
@@ -35,106 +27,64 @@ Create `.pi/settings.local.json` in the directory where you start Pi:
 }
 ```
 
-Relative paths resolve from the **`.pi/` directory**, not the repository root,
-Git root, a parent directory, or a later process working directory. Absolute
-paths and `~/` are supported. Configuration is read again at startup and
-`/reload`; there is no watcher. No settings file is modified by this extension.
-For local-only use, ignore `settings.local.json` in your own Git configuration;
-being Git-ignored is **not** evidence of trust.
+- Relative paths start at **`.pi/`**, not the repository root. Absolute paths and
+  `~/` work; parent directories are not searched for configuration.
+- Only these three arrays are supported. Targets may be files or directories;
+  files must resolve to `.md` for skills/prompts or `.json` for themes.
+- No globs, filters, environment variables or `~user` expansion. Special files,
+  control characters, `* ? [ ] { } $` and canonical paths with surrounding
+  whitespace are rejected. Use `./` for literal leading `!`, `+`, `-` or `~`
+  filenames (except `~/`, which expands).
+- Configuration must be a regular JSON object file, at most **64 KiB**. Invalid
+  JSON/read failures reject the config; invalid fields/items are skipped with
+  warnings. Missing config loads nothing; unknown fields are ignored.
+- Paths are resolved and deduplicated; Pi validates contents and handles
+  collisions. There is no local-wins override. Themes are loaded, not selected:
+  choose a loaded theme with `/settings`.
 
-Only the three root fields above are supported. Each accepts an array of paths
-to regular files or directories. File targets must end in `.md` for skills and
-prompts or `.json` for themes (after symlink resolution). Pi handles content
-validation, directory traversal and collisions. Themes are discovered, **not
-selected**; select a loaded theme through Pi's `/settings`.
+Ignore this local-only file in your Git configuration if appropriate. It is not
+an extra settings layer: it cannot change models, load extensions/packages or
+install anything.
 
-Paths are canonicalized, deduplicated per resource type and kept in order.
-Symlinks may point outside the project; resolved paths appear in diagnostics.
-This is not directory isolation. Pi keeps its own collision behavior; there is
-no local-wins override guarantee.
+## Authorization and safety
 
-### Limitations and diagnostics
+Pi project trust and this extension's local-config approval are separate. In the
+TUI, approve or refuse the listed resources when prompted. The decision is
+session-specific and reused for unchanged configuration. Observed config,
+identity or resolved-path changes invalidate it, even if later reverted.
+Forked sessions do not inherit approval. CLI opt-in covers changed configs for
+that invocation, but never overrides Pi's refusal. Git ignore is not trust.
 
-- Missing configuration is silently ignored. Empty objects/arrays load nothing.
-- Malformed JSON, non-object roots and read errors reject the entire config.
-- Invalid fields/items are warned about and skipped; valid siblings still load.
-- Unknown root fields are ignored without printing their names or values.
-- Configuration must be a regular file, at most **64 KiB**. Special-file
-  configuration and resource targets are rejected.
-- No glob patterns, filters (`!`, `+`, `-` prefixes), `$` variable expansion,
-  `~user`, or control characters. `*`, `?`, `[`, `]`, `{`, `}`, `$` are rejected
-  even when they are literal filename characters. A literal leading `!`, `+`,
-  `-`, or `~` can be expressed with a `./` prefix (except `~/`, which expands).
-- Canonical resource paths with leading/trailing whitespace are rejected,
-  including symlink targets. Pi 1.1.0 trims resource paths; rejecting these
-  prevents the host from loading a different target than the one approved.
-- No model/settings merge, extensions/packages loading, commands from JSON,
-  automatic package installation, or removal of other sources' resources.
-
-Use **`/local-settings`** to show the last discovery source, parsed paths,
-authorization status and warnings. This command is read-only: it does not read
-changed files, prompt for approval, or apply settings. Diagnostics go to the
-TUI or stderr in print/JSON/RPC modes, never protocol stdout.
-
-## Trust
-
-Pi project trust is checked first. If Pi rejects the project, even this
-extension's CLI opt-in cannot load local resources. Install this extension as a
-personal or explicit CLI extension if it must be available before project trust.
-
-In the TUI, the first discovery of valid resources asks for dedicated approval,
-even if Pi already considers the project trusted. Approval **or refusal** is
-stored as non-model-context session data. Unchanged `/reload` does not ask again.
-The decision is bound to the session ID, canonical working directory, config
-file identity, raw config content and resolved path summary. Changes (including
-whitespace, ignored fields, replacement of the config file, or symlink targets)
-require confirmation again. Forked sessions do not inherit approval; resuming
-the same session can reuse it on its active branch.
-
-For automation, explicitly opt in:
+For print/JSON/RPC, explicitly opt in or use an existing valid session approval:
 
 ```sh
 pi --trust-local-settings --print "Review this project"
-# If protected shared project resources exist, also grant Pi trust as needed:
-pi --approve --trust-local-settings --print "Review this project"
 ```
 
-Print, JSON and RPC never wait for approval dialogs: without opt-in or a valid
-approval in the current session they skip local resources. CLI opt-in applies
-to changed configs throughout that invocation, but never overrides Pi's refusal.
-No permanent trust file or Pi `trust.json` is written.
+If Pi also requires project authorization, grant that separately (for example,
+with `--approve`). Non-interactive modes otherwise skip local resources without
+waiting for a dialog. Install this extension personally or through explicit CLI
+loading if it must be available before project trust.
 
-**Approval is not a sandbox or integrity check of resource contents.** Skills
-and prompts may instruct code execution. Files under approved paths may change
-without another confirmation; inspect sources and use OS isolation as needed.
-Local configuration is not a secrets store; declared resource paths appear in
-approval UI and diagnostics. Unknown field values and malformed JSON fragments
-are not displayed.
+**Approval is not a sandbox or a content-integrity check.** Skills/prompts may
+instruct code execution; files inside approved paths can change without another
+prompt. Symlinks may leave the project. Resource paths appear in approval UI and
+diagnostics, so this configuration is not a secrets store. Unknown values and
+malformed JSON fragments are not displayed. The extension writes neither
+settings nor permanent trust files.
 
-## Reload and native flags
+## Reload and diagnostics
 
-`/reload` rebuilds this extension's contributions. Removing a path or deleting
-the config removes that contribution on the next reload. The same resource can
-remain if another source also supplies it.
+Run **`/reload`** after changing configuration; there is no watcher. Removed paths
+or deleted config remove this extension's contributions, but another source may
+still provide the same resource.
 
-In Pi **1.1.0**, `--no-skills`, `--no-prompt-templates`, and `--no-themes` disable
-native discovered/configured paths but **do not suppress extension-discovered
-paths**, including this extension's authorized paths. This extension does not
-parse argv or simulate native priority rules. To skip these local resources,
-remove the local paths, refuse local authorization, or do not load the extension.
+**`/local-settings`** shows the last discovered source, paths, authorization and
+warnings. It is read-only: it does not reread changes, request approval or apply
+settings. Automation diagnostics go to stderr, never protocol stdout.
 
-## Development
+In Pi **1.1.0**, `--no-skills`, `--no-prompt-templates` and `--no-themes` do **not**
+suppress extension-discovered resources. To skip these local resources, remove
+their paths, refuse local approval or do not load this extension.
 
-From the repository root:
-
-```sh
-npm ci --ignore-scripts
-npm run check
-npm run check:pack
-```
-
-Tests use isolated temporary homes/agent directories and real Pi loaders,
-including reload and tarball loading. They do not call a model.
-
-MIT licensed. The `pi-package` keyword makes the published package eligible for
-Pi gallery discovery; it is not a claim of publication or gallery indexing.
+MIT licensed.

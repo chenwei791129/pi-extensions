@@ -103,7 +103,7 @@ npm run check:pack
 ```
 
 使用 `.node-version` 的 Node 24.14.1。Actions 固定至查證過的 commit SHA，
-未啟用 dependency cache。依賴 lifecycle scripts 保持停用，決策見根 README。
+未啟用 dependency cache。依賴 lifecycle scripts 保持停用，決策見根 [AGENTS.md](../AGENTS.md)。
 審閱 `git status`，按檔名 stage，只提交本次工作；不要使用 `git add .`。
 
 `publish-<component>.yml` 接受該套件的 tag push 與 workflow dispatch。
