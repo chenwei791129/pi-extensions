@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/chenwei791129/pi-extensions/compare/pi-local-settings-v0.1.0...pi-local-settings-v0.1.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **ci:** bootstrap first npm release with staged approval ([607e586](https://github.com/chenwei791129/pi-extensions/commit/607e58689662458428ff425dec5b31140e838ec1))
+
 ## 0.1.0 (2026-10-09)
 
 
