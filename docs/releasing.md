@@ -109,34 +109,43 @@ npm run check:pack
 以 public access／provenance 發布。不同版本的同一 package 不會同時發布；
 不同 package 使用各自的 concurrency group。
 
-## 首次 npm 發布與 bootstrap
+## 首次 npm 發布與 staged bootstrap
 
-再次查證 [npm Trusted Publishing 文件](https://docs.npmjs.com/trusted-publishers)。
-目前需 Node >=22.14.0、npm >=11.5.1；發布守門腳本會檢查 npm 下限。
-本機 `npm whoami` 不是 OIDC 權限測試，本機登入不是 Actions 發布的必要條件。
+再次查證 [npm Staged Publishing 文件](https://docs.npmjs.com/staged-publishing)
+與 [Trusted Publishing 文件](https://docs.npmjs.com/trusted-publishers)。OIDC 需
+Node >=22.14.0、npm >=11.5.1；staging 需 npm >=11.15.0。bootstrap workflow
+使用 Node 24.14.1，透過 `npm exec` 固定 npm **11.18.0**，不安裝全域工具。
+本機登入不是 Actions 發布的必要條件。
 
-目前官方文件的設定入口是既有套件的 Settings → Trusted Publisher，沒有描述
-未發布套件的預先綁定入口。若當時 npm 已能預先綁定，優先直接使用 OIDC；
-否則使用已核准的短效 token bootstrap，仍由 Actions 發布，不改成本機發布。
+首次 `0.1.0` 已有 GitHub Release／tag，但原直接發布遭 npm 2FA 拒絕。
+保留 `pi-local-settings-v0.1.0` 指向 `95ee14c169b60416bc959fa7f2a75c23e044525d`，
+**不移動 tag、不重跑它的舊 workflow**。新 `.github/workflows/stage-bootstrap.yml`
+只接受 main 的手動 dispatch，且只允許此套件的首次 `0.1.0`。
 
 使用者自行操作 npm／GitHub 網頁，不把密碼、OTP 或 token 貼到對話：
 
-1. 建立最小權限、短效的 granular npm token，只授予首次建立此 scoped public
-   套件需要的權限，配置必要的 CI 2FA bypass。若無法限制到未建立的單一套件，
-   使用最小可用 scope 與最短有效期；政策不允許時停止，不放寬為長期 token。
-2. 建立 **Repository Secret** `NPM_BOOTSTRAP_TOKEN`，並將 **Repository
-   Variable** `NPM_BOOTSTRAP_ENABLED` 設為字串 `true`。workflow 沒有 environment，
-   不使用 Environment Secret。
-3. 合併首次 Release PR，讓 release-please 自動建立
-   `pi-local-settings-v0.1.0` 並 dispatch 發布。守門只允許此套件的 0.1.0
-   bootstrap，且 registry 必須回傳 404。其他 package 始終走 OIDC，不注入此 token。
-4. Secret 僅注入 bootstrap job 的發布步驟，不注入安裝、測試或 release-please。
-   bootstrap job 的 `id-token: write` 用於 provenance。
-5. 成功後配置 OIDC，**撤銷 npm token、刪除 Secret 與 bootstrap variable**。
-6. 使用下一個經確認的合法版本，由 Release PR／Actions 實際驗證 OIDC 發布。
-   不重複發布既有版本；設定已儲存不等於 OIDC 發布已成功。
+1. 建立最小範圍、短效的 granular token，權限選 **Read and write (stage only)**。
+   `npm stage publish` 不需要 2FA，**不用勾 Bypass two-factor authentication**；
+   不停用帳號的 2FA。若未建立的單一套件無法選取，使用最小可用 scope。
+2. 建立 **Repository Secret** `NPM_BOOTSTRAP_TOKEN`，**Repository Variable**
+   `NPM_BOOTSTRAP_ENABLED` 設為字串 `true`。沒有 environment，不用 Environment Secret。
+3. 經維護者授權，執行 `stage-bootstrap.yml`，ref 選 **main**。守門確認事件 SHA、
+   main ancestry、原 tag SHA、套件名稱／版本，並比較 main 與原 tag 的 npm tarball
+   integrity，必須完全一致。registry 必須為 404；placeholder／已發布套件會阻止重傳。
+4. Actions 用 `npm stage publish` 上傳 public／provenance stage。Secret 僅注入
+   此步驟，不注入安裝、測試或 release-please；不在本機上傳。Stage 不是公開發布。
+   首次 staging 會建立公開的 **`0.0.0-stage` placeholder**，不代表 `0.1.0` 已上線。
+5. 使用者登入 npm 的 **Staged Packages** 分頁，檢查套件、版本與內容後，按
+   **Approve** 並親自完成 2FA。這一步才讓 `0.1.0` 公開；不把 OTP 交給 CI。
+6. 公開後完成下方驗收，再設定 OIDC，**撤銷 token、刪除 Secret／bootstrap variable**。
+   使用下一個經確認的合法版本，實際驗證 `publish.yml` 的 OIDC 發布。
 
-若預先 OIDC 與 token bootstrap 都不可行，停止並取得其他方案的同意。
+Bootstrap provenance 記錄的是 **main 的 automation commit／stage-bootstrap.yml**，
+不是原 release tag 的 commit。守門的完整 tarball integrity 比對保證發布內容與
+原 tag 一致；不偽造 `GITHUB_SHA`。驗收時保留兩個 SHA、workflow URL 與 integrity。
+
+其他 package／後續版本不取得 bootstrap token。新的 `publish.yml` 僅走 OIDC，
+bootstrap 旗標仍開啟時會阻止此套件的後續版本，避免切換前誤發布。
 
 ## OIDC 設定
 
@@ -166,9 +175,18 @@ access 設成「Require two-factor authentication and disallow tokens」。
 - CLI 恢復範例（先確認沒有進行中／已完成發布，且取得操作授權）：
 
   ```sh
-  gh workflow run publish.yml --ref pi-local-settings-v0.1.0
+  # Example: verify this OIDC version tag exists before dispatching.
+  gh workflow run publish.yml --ref pi-local-settings-v0.1.1
   ```
 
+- 首次 stage 尚未建立且 registry 為 404 時，經授權才可執行：
+
+  ```sh
+  gh workflow run stage-bootstrap.yml --ref main
+  ```
+
+  若已建立 stage／`0.0.0-stage` placeholder，先到 npm 檢查既有 stage，核准或拒絕，
+  **不要重跑 staging**。拒絕後的 placeholder 也會使守門停止，需另行確認恢復方案。
 - CI dispatch 遺漏時，對對應 Release PR branch 手動執行 `ci.yml`。
 - 不重跑整個 release-please 當作 npm 發布重試：既有 Release 可能不再出現在
   action 的新建 release outputs 中。
@@ -188,5 +206,5 @@ access 設成「Require two-factor authentication and disallow tokens」。
    skill／prompt／theme，明確授權 smoke test，不讀取開發者真實設定或呼叫付費模型。
 4. 查看 <https://pi.dev/packages>，保留實際可驗證 URL。`pi-package` keyword
    只是探索資格，不等於已呈現；尚未索引時記錄為外部依賴，不重複發布版本刷新。
-5. 首次 token 發布後完成清理，並以後續真實 OIDC 發布驗證成功，才宣稱整體
-   發布策略完成。
+5. Stage job 成功僅代表等待核准；先確認公開的 `0.1.0` metadata 與 tarball，
+   再完成 bootstrap 清理，並以後續真實 OIDC 發布驗證成功，才宣稱整體發布策略完成。

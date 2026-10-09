@@ -1,0 +1,56 @@
+name: Stage first pi-local-settings release
+
+on:
+  workflow_dispatch: # Run on main; the approved 0.1.0 tag remains immutable.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-package-pi-local-settings
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # provenance, not permission to publish directly
+    env:
+      NPM_CONFIG_IGNORE_SCRIPTS: 'true'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # actions/setup-node v6.5.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+      - run: git fetch origin main --tags
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm run check:pack
+      - name: Verify immutable release and identical main/tag tarballs
+        run: >-
+          npm exec --yes --ignore-scripts --package=npm@11.18.0 --
+          node scripts/stage-bootstrap.ts
+        env:
+          NPM_BOOTSTRAP_ENABLED: ${{ vars.NPM_BOOTSTRAP_ENABLED }}
+      - name: Stage only; a maintainer must approve with 2FA on npm
+        run: >-
+          npm exec --yes --ignore-scripts --package=npm@11.18.0 --
+          npm stage publish --workspace packages/pi-local-settings
+          --ignore-scripts --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+      - name: Record pending approval, not a completed publication
+        run: >-
+          echo '### 0.1.0 staged — not publicly released yet.
+          Open the npm Staged Packages tab and inspect the package.
+          Approve with 2FA. Do not rerun staging:
+          the first stage creates a public 0.0.0-stage placeholder.'
+          >> "$GITHUB_STEP_SUMMARY"

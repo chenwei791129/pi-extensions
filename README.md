@@ -42,6 +42,10 @@ Bot-created PRs/tags do not automatically trigger other workflows with
 `GITHUB_TOKEN`. We explicitly dispatch read-only CI for Release PR branches and
 `publish.yml` at every released package tag, without a long-lived GitHub PAT.
 Publication validates the tag and publishes only its configured workspace.
+The first `0.1.0` uses `stage-bootstrap.yml` on main with a short-lived,
+stage-only token and a byte-identical tarball check against its immutable tag.
+A maintainer approves it with 2FA on npm; later versions use token-free OIDC.
+A successful stage is not a completed public release.
 
 See [release operations](docs/releasing.md) for GitHub permissions, first npm
 publication, OIDC, recovery, and adding independently tagged packages. The
