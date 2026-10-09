@@ -35,8 +35,9 @@ JSON 語法，其他檔案的格式檢查不變；不要在每次 Release PR 手
    CHANGELOG 更新。Release PR 仍須由維護者審閱與合併，不自動批准或合併。
 3. 合併 Release PR 後，release-please 自動為其中每個已發布 package 建立獨立
    tag 與 GitHub Release。
-4. 每個 tag 都明確 dispatch `.github/workflows/publish.yml`，由該 tag 的快照
-   執行驗證，再只發布選中的 workspace；不使用 `npm publish --workspaces`。
+4. 每個 tag 明確 dispatch `publish-<component>.yml`，由該 tag 的快照呼叫
+   共用 `publish.yml`，驗證 caller 與 package 相符，再只發布該 workspace。
+   不使用 `npm publish --workspaces`。
 5. 發布成功後完成下方 npm／provenance／gallery 的獨立驗收。
 
 ### GitHub 設定與 bot 事件
@@ -51,7 +52,7 @@ Release PR 的必要設定；workflow 本身不會批准 PR。不要因此把整
 - release-please 使用內建的短效 `GITHUB_TOKEN`，不要求額外 GitHub PAT。
 - `scripts/dispatch-releases.ts` 對每個已建立／更新的 Release PR 明確 dispatch
   `ci.yml` 到同 repo 的 Release PR branch，使其 head commit 取得 CI checks。
-- 對每個 release 的 `<path>--tag_name` 明確 dispatch `publish.yml` 到該 tag。
+- 對每個 release 的 `<path>--tag_name` 明確 dispatch `publish-<component>.yml` 到該 tag。
   `workflow_dispatch` 是 `GITHUB_TOKEN` 可以啟動的例外，不依賴 bot 的 tag push。
 - dispatcher 先驗證 package allowlist、component／版本格式、PR branch／base／
   repo；資料以 API JSON body 傳遞，不拼接 shell。
@@ -79,10 +80,13 @@ repo 設定、workflow 檔案存在或本機測試通過，不代表遠端 Actio
    `include-component-in-tag`，不要使用 wildcard、父目錄或不同 tag separator。
 3. 新 package 尚未 release 時，不預先填入版本 manifest。已有正式 release 的
    package 遷入時，依 release-please bootstrap 文件填入真實已發布版本。
-4. 配置該 npm package 的 Trusted Publisher。publisher 仍是本 repo 的
-   **`publish.yml`**（沒有 environment）；不是 `release-please.yml`。
-5. 現有 dispatcher、publish selector 與 per-package concurrency 自動支援新增
-   allowlist entry，不需為每個 package 新建 workflow。
+4. 複製 `publish-pi-local-settings.yml` 為 `publish-<component>.yml`，調整 name、
+   tag prefix、concurrency group 與固定 `package_path`；仍呼叫共用 `publish.yml`。
+   不加入 `secrets: inherit`。該 wrapper 必須在首次版本 tag 的 commit 中存在。
+5. 配置該 npm package 的 Trusted Publisher：填對應的 **caller filename**，例如
+   `publish-pi-example.yml`，environment 留空。不要填 `publish.yml` 或
+   `release-please.yml`。dispatcher 依 component 自動選取 wrapper；README 的
+   row 使用此 wrapper 的 badge，可獨立顯示 main preview 檢查。
 6. **目前 bootstrap token 只授權首次 pi-local-settings 發布**，新增 package
    不會自動繼承它。若 npm 尚無法替新的未發布 package 預設 OIDC publisher，
    需另確認該 package 的最小權限 bootstrap 方案；不能擴用現有 token。
@@ -102,8 +106,14 @@ npm run check:pack
 未啟用 dependency cache。依賴 lifecycle scripts 保持停用，決策見根 README。
 審閱 `git status`，按檔名 stage，只提交本次工作；不要使用 `git add .`。
 
-`publish.yml` 同時接受 tag push 與對**既有 tag**的 workflow dispatch。
-`scripts/release.ts` 會拒絕 branch dispatch、未知／根 tag、版本不符、event SHA
+`publish-<component>.yml` 接受該套件的 tag push 與 workflow dispatch。
+`publish.yml` 僅接受 `workflow_call`，不直接 dispatch。Tag 執行真正的發布；
+main 手動 dispatch 只執行 preview，發布 job 會跳過，validation job 只有 read 權限。
+其他 branch 的 preview 會被拒絕。README badge 明確篩選 main／workflow_dispatch，
+代表該 package 最新手動 preview，不是 npm 發布成功，也不是其他 package 的狀態。
+檢查包含 monorepo 的整合測試與該 workspace 的 tarball，而非只有該 package 的測試。
+
+`scripts/release.ts` 會拒絕 branch 發布、未知／根 tag、caller/package 不符、版本不符、event SHA
 不符及尚未納入 main 的 commit。它從 tag 中選擇唯一的已配置 package，輸出經
 驗證的 workspace 路徑。validate job 重跑 checks／pack，發布 job 再確認來源，
 以 public access／provenance 發布。不同版本的同一 package 不會同時發布；
@@ -138,7 +148,7 @@ Node >=22.14.0、npm >=11.5.1；staging 需 npm >=11.15.0。bootstrap workflow
 5. 使用者登入 npm 的 **Staged Packages** 分頁，檢查套件、版本與內容後，按
    **Approve** 並親自完成 2FA。這一步才讓 `0.1.0` 公開；不把 OTP 交給 CI。
 6. 公開後完成下方驗收，再設定 OIDC，**撤銷 token、刪除 Secret／bootstrap variable**。
-   使用下一個經確認的合法版本，實際驗證 `publish.yml` 的 OIDC 發布。
+   使用下一個經確認的合法版本，實際驗證 package caller／共用 workflow 的 OIDC 發布。
 
 Bootstrap provenance 記錄的是 **main 的 automation commit／stage-bootstrap.yml**，
 不是原 release tag 的 commit。守門的完整 tarball integrity 比對保證發布內容與
@@ -155,7 +165,7 @@ npm package Settings → Trusted Publisher → GitHub Actions：
 | --- | --- |
 | Organization or user | `chenwei791129` |
 | Repository | `pi-extensions` |
-| Workflow filename | `publish.yml` |
+| Workflow filename | `publish-pi-local-settings.yml`（其他 package 填自己的 caller） |
 | Environment name | 留空 |
 | Allowed actions | 明確允許直接 `npm publish` |
 
@@ -165,18 +175,39 @@ npm package Settings → Trusted Publisher → GitHub Actions：
 產生 provenance。正式 OIDC job 沒有 npm token；驗證成功後，建議 Publishing
 access 設成「Require two-factor authentication and disallow tokens」。
 
+### 由共用入口切換至 package caller
+
+`0.1.1` 已實際驗證舊 `publish.yml` 的 OIDC 發布；新的 caller 尚未真正發布。
+GitHub reusable workflow 的 npm 驗證綁定 **calling workflow**，父／子都必須允許
+`id-token: write`，不能只綁定內含 publish 指令的檔案。
+
+本次只做 `ci:`／`docs:` 變更與 main preview，**不建立新的 release tag**，也不
+修改既有 tag。新 caller 的 publisher 應在下一次正式 release 前設定，且兩天內
+完成其首次 OIDC 發布；不要現在僅為 badge 重發既有版本或觸發新 release。
+若需要保留舊 tag 的恢復能力，可暫留已驗證的 `publish.yml` publisher；新 caller
+成功後再移除舊綁定。既有 `0.1.0`／`0.1.1` tag 沒有新 wrapper，不能以新 wrapper
+執行它們，必要時先查原 run 再決定恢復方式。
+
+Main preview 範例（不建立 tag、不上傳 stage、不發 npm）：
+
+```sh
+gh workflow run publish-pi-local-settings.yml --ref main
+```
+
 ## 失敗與恢復
 
 - GitHub Release／tag 成功不代表 npm 發布成功。先查 Actions run 與 registry。
 - dispatcher 對每個不同 ref 最多發送一次，某個 API 失敗仍嘗試其他 package，
   最後回報失敗清單；不自動盲目重試不確定是否已接受的 request。
-- 若 dispatch 遺漏，可在 Actions 手動執行 `publish.yml`，**選擇既有 package tag**，
-  不要在 main 執行，也不要移動 tag、重建同版本或重新合併 Release PR。
+- 新 caller 的 dispatch 遺漏時，可手動執行對應 `publish-<component>.yml`，
+  **選擇已包含此 wrapper 的既有 package tag**。Main 僅 preview，不是真正恢復發布；
+  不要移動 tag、重建同版本或重新合併 Release PR。
 - CLI 恢復範例（先確認沒有進行中／已完成發布，且取得操作授權）：
 
   ```sh
-  # Example: verify this OIDC version tag exists before dispatching.
-  gh workflow run publish.yml --ref pi-local-settings-v0.1.1
+  # Set an existing tag that contains the new package caller.
+  gh workflow run publish-pi-local-settings.yml \
+    --ref "${EXISTING_TAG:?Set an existing version tag}"
   ```
 
 - 首次 stage 尚未建立且 registry 為 404 時，經授權才可執行：

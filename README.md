@@ -2,9 +2,13 @@
 
 An npm-workspaces repository for small, independently published Pi extensions.
 
-| Package | Purpose |
-| --- | --- |
-| [@chenwei791129/pi-local-settings](packages/pi-local-settings) | Session-authorized local skills, prompts and themes |
+| Package | Purpose | Release checks (main preview) |
+| --- | --- | --- |
+| [@chenwei791129/pi-local-settings](packages/pi-local-settings) | Session-authorized local skills, prompts and themes | [![pi-local-settings release checks](https://github.com/chenwei791129/pi-extensions/actions/workflows/publish-pi-local-settings.yml/badge.svg?branch=main&event=workflow_dispatch)](https://github.com/chenwei791129/pi-extensions/actions/workflows/publish-pi-local-settings.yml) |
+
+Each badge shows that package's latest manual **main preview**, not an npm
+publication or the status of other packages. A preview checks sources, tests
+and packaging without creating a tag, uploading a stage or publishing.
 
 ## Development
 
@@ -40,8 +44,13 @@ are not linked. The Node workspace plugin keeps the root lockfile in sync.
 
 Bot-created PRs/tags do not automatically trigger other workflows with
 `GITHUB_TOKEN`. We explicitly dispatch read-only CI for Release PR branches and
-`publish.yml` at every released package tag, without a long-lived GitHub PAT.
-Publication validates the tag and publishes only its configured workspace.
+`publish-<component>.yml` at each package tag, without a long-lived GitHub PAT.
+Each package has a thin caller (currently `publish-pi-local-settings.yml`);
+`publish.yml` is the shared reusable implementation. Publication validates
+both the caller/package identity and immutable tag, then publishes only that
+workspace. Dispatching the caller on main runs a read-only preview instead.
+Trusted Publisher must bind the **caller filename** before its next real
+release; see the transition instructions in [release operations](docs/releasing.md).
 The first `0.1.0` uses `stage-bootstrap.yml` on main with a short-lived,
 stage-only token and a byte-identical tarball check against its immutable tag.
 A maintainer approves it with 2FA on npm; later versions use token-free OIDC.
