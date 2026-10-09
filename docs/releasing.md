@@ -23,6 +23,8 @@
 `.release-please-manifest.json` 記錄 release-please 管理的已發布版本。
 尚未首次 release 時保持 `{}`，目前 package 的 `initial-version` 為 `0.1.0`。
 不要提前把 0.1.0 寫成已發布版本，也不要長期設定固定 `release-as`。
+此檔案保留 release-please 產生的格式：Biome 僅停用它的 formatter，仍檢查
+JSON 語法，其他檔案的格式檢查不變；不要在每次 Release PR 手動改格式。
 
 ## 正常發布流程
 
