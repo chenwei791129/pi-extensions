@@ -2,7 +2,7 @@
 
 An npm-workspaces repository for small, independently published Pi extensions.
 
-| Package | Purpose | Release checks (main preview) |
+| Package | Purpose | Release checks<br>(main preview) |
 | --- | --- | --- |
 | [@chenwei791129/pi-local-settings](packages/pi-local-settings) | Session-authorized local skills, prompts and themes | [![pi-local-settings release checks](https://github.com/chenwei791129/pi-extensions/actions/workflows/publish-pi-local-settings.yml/badge.svg?branch=main&event=workflow_dispatch)](https://github.com/chenwei791129/pi-extensions/actions/workflows/publish-pi-local-settings.yml) |
 
