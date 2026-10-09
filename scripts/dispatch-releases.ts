@@ -8,7 +8,7 @@ import {
 } from "./release-config.ts";
 
 export interface DispatchRequest {
-  workflow: "ci.yml" | "publish.yml";
+  workflow: "ci.yml" | `publish-${string}.yml`;
   ref: string;
 }
 export type GitHubRequest = (
@@ -66,7 +66,7 @@ export async function buildDispatches(
     const pkg = packages.find((pkg) => pkg.path === path);
     assert.ok(pkg, "Release output names an unconfigured package.");
     validateReleaseTag(tag, version, pkg.component);
-    result.push({ workflow: "publish.yml", ref: tag });
+    result.push({ workflow: `publish-${pkg.component}.yml`, ref: tag });
   }
   for (const pr of pullRequests) {
     assert.ok(pr.headBranchName.startsWith("release-please--branches--main"));

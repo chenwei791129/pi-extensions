@@ -1,21 +1,24 @@
-name: Publish package
+name: Reusable package release
 
 on:
-  push:
-    tags: ['*-v*']
-  workflow_dispatch: # Release Please dispatches this workflow at each tag
+  workflow_call:
+    inputs:
+      package_path:
+        required: true
+        type: string
+      dry_run:
+        required: true
+        type: boolean
 
 permissions:
   contents: read
-
-concurrency:
-  group: publish-ref-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
   validate:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
     outputs:
       package_path: ${{ steps.target.outputs.package_path }}
       component: ${{ steps.target.outputs.component }}
@@ -31,10 +34,18 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - run: git fetch origin main
-      - run: node scripts/release.ts
+      - name: Validate tagged publication
+        if: '!inputs.dry_run'
+        run: node scripts/release.ts
         id: target
         env:
+          EXPECTED_PACKAGE_PATH: ${{ inputs.package_path }}
           NPM_BOOTSTRAP_ENABLED: ${{ vars.NPM_BOOTSTRAP_ENABLED }}
+      - name: Validate main preview without publishing
+        if: inputs.dry_run
+        run: node scripts/preview-release.ts
+        env:
+          EXPECTED_PACKAGE_PATH: ${{ inputs.package_path }}
       - name: Refuse token bootstrap in the tag workflow
         if: steps.target.outputs.bootstrap == 'true'
         run: |
@@ -46,11 +57,11 @@ jobs:
       - name: Check the selected workspace tarball
         run: npm pack --workspace "${PACKAGE_PATH}" --ignore-scripts --dry-run
         env:
-          PACKAGE_PATH: ${{ steps.target.outputs.package_path }}
+          PACKAGE_PATH: ${{ inputs.package_path }}
 
   publish-oidc:
     needs: validate
-    if: needs.validate.outputs.bootstrap != 'true'
+    if: ${{ !inputs.dry_run && needs.validate.outputs.bootstrap != 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     concurrency:

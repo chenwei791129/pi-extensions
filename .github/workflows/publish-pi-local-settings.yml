@@ -1,0 +1,27 @@
+name: Release pi-local-settings
+run-name: >-
+  pi-local-settings ${{ github.ref_type == 'tag' && 'publish' || 'preview' }}
+  (${{ github.ref_name }})
+
+on:
+  push:
+    tags: ['pi-local-settings-v*']
+  workflow_dispatch: # main = preview; a version tag = actual publication
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-pi-local-settings-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    permissions:
+      contents: read
+      id-token: write # required by both caller and reusable OIDC workflow
+    # npm Trusted Publisher binds this caller, not publish.yml.
+    uses: ./.github/workflows/publish.yml
+    with:
+      package_path: packages/pi-local-settings
+      dry_run: ${{ github.ref_type != 'tag' }}

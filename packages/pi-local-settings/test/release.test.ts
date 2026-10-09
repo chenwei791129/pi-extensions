@@ -121,6 +121,9 @@ test("release guard selects only the tagged workspace and verifies SHA/main, inc
     GITHUB_REPOSITORY: "chenwei791129/pi-extensions",
     GITHUB_REF_TYPE: "tag",
     GITHUB_REF_NAME: "pi-local-settings-v0.1.0",
+    GITHUB_REF: "refs/tags/pi-local-settings-v0.1.0",
+    GITHUB_WORKFLOW_REF:
+      "chenwei791129/pi-extensions/.github/workflows/publish-pi-local-settings.yml@refs/tags/pi-local-settings-v0.1.0",
     GITHUB_SHA: sha,
     NPM_BOOTSTRAP_ENABLED: "false",
     GITHUB_OUTPUT: output,
@@ -133,6 +136,43 @@ test("release guard selects only the tagged workspace and verifies SHA/main, inc
       stdio: "pipe",
     });
   assert.match(run(), /Validated/);
+  assert.match(
+    run({ EXPECTED_PACKAGE_PATH: "packages/pi-local-settings" }),
+    /Validated/,
+  );
+  assert.throws(() =>
+    run({
+      EXPECTED_PACKAGE_PATH: "packages/pi-local-settings",
+      GITHUB_WORKFLOW_REF: "other-caller",
+    }),
+  );
+  const previewEnv = {
+    ...env,
+    GITHUB_REF: "refs/heads/main",
+    GITHUB_REF_TYPE: "branch",
+    GITHUB_EVENT_NAME: "workflow_dispatch",
+    EXPECTED_PACKAGE_PATH: "packages/pi-local-settings",
+    GITHUB_WORKFLOW_REF:
+      "chenwei791129/pi-extensions/.github/workflows/publish-pi-local-settings.yml@refs/heads/main",
+  };
+  const preview = (overrides = {}) =>
+    execFileSync(process.execPath, [resolve("scripts/preview-release.ts")], {
+      cwd: f.root,
+      env: { ...previewEnv, ...overrides },
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+  assert.match(preview(), /no tag or publication/);
+  for (const overrides of [
+    { GITHUB_EVENT_NAME: "push" },
+    { GITHUB_REF: "refs/heads/other" },
+    { GITHUB_REF_TYPE: "tag" },
+    { GITHUB_SHA: "bad" },
+    { EXPECTED_PACKAGE_PATH: "packages/unknown" },
+    { EXPECTED_PACKAGE_PATH: "packages/pi-example" },
+    { GITHUB_WORKFLOW_REF: "other-caller" },
+  ])
+    assert.throws(() => preview(overrides));
   assert.match(
     await readFile(output, "utf8"),
     /package_path=packages\/pi-local-settings/,

@@ -47,8 +47,11 @@ test("each independently tagged package is dispatched; bot Release PR gets expli
     request,
   );
   assert.deepEqual(dispatches, [
-    { workflow: "publish.yml", ref: "pi-local-settings-v0.1.0" },
-    { workflow: "publish.yml", ref: "pi-example-v2.3.4" },
+    {
+      workflow: "publish-pi-local-settings.yml",
+      ref: "pi-local-settings-v0.1.0",
+    },
+    { workflow: "publish-pi-example.yml", ref: "pi-example-v2.3.4" },
     { workflow: "ci.yml", ref: "release-please--branches--main" },
   ]);
   assert.deepEqual(requested, [{ path: "pulls/1", body: undefined }]);
@@ -120,8 +123,11 @@ test("deduplicate dispatches and attempt other packages after a failure without 
   await assert.rejects(
     dispatchAll(
       [
-        { workflow: "publish.yml", ref: "pi-local-settings-v0.1.0" },
-        { workflow: "publish.yml", ref: "pi-example-v2.3.4" },
+        {
+          workflow: "publish-pi-local-settings.yml",
+          ref: "pi-local-settings-v0.1.0",
+        },
+        { workflow: "publish-pi-example.yml", ref: "pi-example-v2.3.4" },
       ],
       async (_path, body) => {
         const ref = String(body?.ref);

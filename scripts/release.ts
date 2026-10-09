@@ -20,6 +20,18 @@ export function bootstrapRequested(
   return enabled === "true" && pkg.name === BOOTSTRAP_PACKAGE;
 }
 
+export function validateCaller(
+  pkg: ReleasePackage,
+  env: NodeJS.ProcessEnv,
+): void {
+  assert.equal(env.EXPECTED_PACKAGE_PATH, pkg.path);
+  assert.equal(
+    env.GITHUB_WORKFLOW_REF,
+    `chenwei791129/pi-extensions/.github/workflows/publish-${pkg.component}.yml@${env.GITHUB_REF}`,
+    "Caller workflow must belong to the selected package.",
+  );
+}
+
 export async function validateRelease(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<ReleasePackage> {
@@ -36,8 +48,7 @@ export async function validateRelease(
     `${target.component}-v${target.version}`,
     "Tag and package version must match.",
   );
-  if (env.EXPECTED_PACKAGE_PATH)
-    assert.equal(target.path, env.EXPECTED_PACKAGE_PATH);
+  if (env.EXPECTED_PACKAGE_PATH) validateCaller(target, env);
   const git = (...args: string[]) =>
     execFileSync("git", args, { encoding: "utf8" }).trim();
   const commit = git("rev-parse", "HEAD");

@@ -51,6 +51,7 @@ test("pinned release-please creates independent tags/versions and updates the sh
   let merged: PullRequest | undefined;
   let changeBoth = true;
   let initialRelease = false;
+  let maintenanceOnly = false;
   const github = {
     repository: { owner: "chenwei791129", repo: "pi-extensions" },
     getFileJson: async (path: string) =>
@@ -74,6 +75,23 @@ test("pinned release-please creates independent tags/versions and updates the sh
     },
     async *tagIterator() {},
     async *mergeCommitIterator() {
+      if (maintenanceOnly) {
+        yield {
+          sha: "docs",
+          message: "docs: add package badges",
+          files: ["README.md"],
+        };
+        yield {
+          sha: "ci",
+          message: "ci: split release callers",
+          files: [
+            "packages/pi-local-settings/test/release.test.ts",
+            ".github/workflows/publish.yml",
+          ],
+        };
+        yield { sha: "baseline", message: "chore: prior release", files: [] };
+        return;
+      }
       yield {
         sha: "fix",
         message: "fix: correct local settings",
@@ -95,10 +113,13 @@ test("pinned release-please creates independent tags/versions and updates the sh
     { initial: true, both: true },
     { initial: false, both: true },
     { initial: false, both: false },
+    { initial: false, both: false, maintenance: true },
   ]) {
     const { initial, both } = scenario;
     initialRelease = initial;
     changeBoth = both;
+    maintenanceOnly =
+      "maintenance" in scenario && scenario.maintenance === true;
     await f.file(
       join(f.root, ".release-please-manifest.json"),
       JSON.stringify(initial ? {} : versions),
@@ -120,7 +141,11 @@ test("pinned release-please creates independent tags/versions and updates the sh
       { logger: { debug() {}, info() {}, warn() {}, error() {}, trace() {} } },
     );
     const prs = await manifest.buildPullRequests();
-    assert.equal(prs.length, 1);
+    assert.equal(prs.length, maintenanceOnly ? 0 : 1);
+    if (maintenanceOnly) {
+      assert.deepEqual(await manifest.buildReleases(), []);
+      continue;
+    }
     const pr = prs[0];
     assert.ok(
       pr.updates.some(
