@@ -1,0 +1,41 @@
+{
+  "name": "@chenwei791129/pi-local-settings",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Session-authorized local skill, prompt, and theme paths for Pi.",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "settings",
+    "skills"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24.14.1"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chenwei791129/pi-extensions.git",
+    "directory": "packages/pi-local-settings"
+  },
+  "homepage": "https://github.com/chenwei791129/pi-extensions/tree/main/packages/pi-local-settings#readme",
+  "bugs": {
+    "url": "https://github.com/chenwei791129/pi-extensions/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

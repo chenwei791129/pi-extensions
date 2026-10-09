@@ -1,0 +1,49 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please-main
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: write # explicitly dispatch CI/publish; bot events do not recur
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      # actions/setup-node v6.5.0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      # googleapis/release-please-action v4.4.1 (release-please 17.3.0)
+      - uses: "googleapis/release-please-action@\
+          5c625bfb5d1ff62eadeeb3772007f7f66fdcf071"
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          target-branch: main
+      - name: Dispatch Release PR CI and each package publication
+        if: >-
+          steps.release.outputs.prs_created == 'true' ||
+          steps.release.outputs.releases_created == 'true'
+        run: node scripts/dispatch-releases.ts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_PLEASE_OUTPUTS: ${{ toJSON(steps.release.outputs) }}
