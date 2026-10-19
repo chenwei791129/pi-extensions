@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0 # immutable release fixture for bootstrap regression
           persist-credentials: false
       # actions/setup-node v6.5.0
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: .node-version
           package-manager-cache: false
